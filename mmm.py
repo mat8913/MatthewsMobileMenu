@@ -17,6 +17,26 @@ class MenuItem(Protocol):
     def do_action(self) -> None: ...
 
 
+class Menu():
+    menu_items: list[MenuItem]
+
+    def __init__(self, menu_items: list[MenuItem]) -> None:
+        self.menu_items = menu_items
+
+    def ask_and_get_selected_item(self) -> MenuItem:
+        self.print_menu()
+        user_input = input('> ')
+        selected_menu_item = self.parse_selection(user_input)
+        return selected_menu_item
+
+    def parse_selection(self, input: str) -> MenuItem:
+        return self.menu_items[int(input)]
+
+    def print_menu(self) -> None:
+        for i, menu_item in enumerate(self.menu_items):
+            print(f"{i})\t{menu_item.get_name()}")
+
+
 class TerminalMenuItem():
     name: str
     cmd: str
@@ -55,28 +75,16 @@ def get_menu_file_path() -> Path:
     raise Exception('No menu file found in working directory or any parent directories: ' + MENU_FILE_NAME)
 
 
-def load_menu_file(menu_file_path: Path) -> list[MenuItem]:
+def load_menu_file(menu_file_path: Path) -> Menu:
     with open(menu_file_path) as f:
-        return [TerminalMenuItem(line.rstrip()) for line in f]
-
-
-def print_menu(menu: list[MenuItem]) -> None:
-    i = 0
-    for item in menu:
-        print(str(i) + ')\t' + item.get_name())
-        i = i + 1
-
-
-def parse_selection(menu: list[MenuItem], input: str) -> MenuItem:
-    return menu[int(input)]
+        menu_items: list[MenuItem] = [TerminalMenuItem(line.rstrip()) for line in f]
+    return Menu(menu_items)
 
 
 def main() -> None:
     menu_file_path = get_menu_file_path()
     menu = load_menu_file(menu_file_path)
-    print_menu(menu)
-    user_input = input('> ')
-    selected_menu_item = parse_selection(menu, user_input)
+    selected_menu_item = menu.ask_and_get_selected_item()
     selected_menu_item.do_action()
 
 
