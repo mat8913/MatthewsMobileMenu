@@ -5,6 +5,7 @@
 # Copyright (C) 2022 by Matthew Harm Bekkema <id@mbekkema.name>
 
 import fcntl
+import shlex
 import termios
 from pathlib import Path
 from typing import Iterator, Optional, Protocol
@@ -122,12 +123,72 @@ class CustomMenuLoader():
             yield parent
 
 
+class CdSubmenu(Menu):
+    def __init__(self, state: MmmState, show_hidden: bool = False) -> None:
+        super().__init__([])
+        self.state = state
+        self.show_hidden = show_hidden
+        self.refresh()
+
+    def refresh(self) -> None:
+        self.menu_items.clear()
+        self.menu_items.extend(self.build_menu_items())
+
+    def build_menu_items(self) -> list[MenuItem]:
+        option_menuitems: list[MenuItem] = [
+            BackMenuItem(self.state),
+            CdSubmenu.ToggleHiddenMenuItem(self),
+        ]
+        cd_menuitems = [self.make_cd_menuitem(p) for p in self.get_valid_subdirs()]
+        return option_menuitems + cd_menuitems
+
+    def get_valid_subdirs(self) -> Iterator[Path]:
+        current_dir = Path('.')
+        for p in current_dir.iterdir():
+            if not p.is_dir():
+                continue
+            if self.show_hidden or not p.name.startswith('.'):
+                yield p
+
+    def make_cd_menuitem(self, p: Path) -> MenuItem:
+        return TerminalMenuItem(p.name, "cd " + shlex.quote(p.name))
+
+    class ToggleHiddenMenuItem():
+        def __init__(self, cd_submenu: 'CdSubmenu'):
+            self.cd_submenu = cd_submenu
+
+        def get_name(self) -> str:
+            if self.cd_submenu.show_hidden:
+                return "(Hide Hidden)"
+            else:
+                return "(Show Hidden)"
+
+        def do_action(self) -> None:
+            self.cd_submenu.show_hidden = not self.cd_submenu.show_hidden
+            self.cd_submenu.refresh()
+
+
+class CdMenuItem():
+    def __init__(self, state: MmmState, name: str = "cd", show_hidden: bool = False):
+        self.state = state
+        self.name = name
+        self.show_hidden = show_hidden
+
+    def get_name(self) -> str:
+        return self.name
+
+    def do_action(self) -> None:
+        cd_submenu = CdSubmenu(self.state)
+        self.state.push_menu(cd_submenu)
+
+
 class InitialMenuBuilder():
     def build_initial_menu(self, state: MmmState) -> Menu:
         back_items = [BackMenuItem(state)]
         custom_menu_items = CustomMenuLoader().load_custom_menu()
+        additional_menu_items: list[MenuItem] = [CdMenuItem(state)]
 
-        return Menu(back_items + custom_menu_items)
+        return Menu(back_items + custom_menu_items + additional_menu_items)
 
 
 class MmmApplication():
