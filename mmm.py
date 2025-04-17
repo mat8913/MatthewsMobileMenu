@@ -55,6 +55,23 @@ class MmmState():
         except IndexError:
             return None
 
+    def menu_stack_length(self) -> int:
+        return len(self.menu_stack)
+
+
+class BackMenuItem():
+    def __init__(self, state: MmmState):
+        self.state = state
+
+    def get_name(self) -> str:
+        if self.state.menu_stack_length() <= 1:
+            return "(Quit)"
+        else:
+            return "(Go Back)"
+
+    def do_action(self) -> None:
+        self.state.pop_menu()
+
 
 class TerminalMenuItem():
     name: str
@@ -94,16 +111,23 @@ def get_menu_file_path() -> Path:
     raise Exception('No menu file found in working directory or any parent directories: ' + MENU_FILE_NAME)
 
 
-def load_menu_file(menu_file_path: Path) -> Menu:
+def load_menu_file(menu_file_path: Path) -> list[MenuItem]:
     with open(menu_file_path) as f:
-        menu_items: list[MenuItem] = [TerminalMenuItem(line.rstrip()) for line in f]
-    return Menu(menu_items)
+        return [TerminalMenuItem(line.rstrip()) for line in f]
+
+
+def build_initial_menu(state: MmmState) -> Menu:
+    back_items = [BackMenuItem(state)]
+
+    menu_file_path = get_menu_file_path()
+    custom_menu_items = load_menu_file(menu_file_path)
+
+    return Menu(back_items + custom_menu_items)
 
 
 def main() -> None:
     state = MmmState()
-    menu_file_path = get_menu_file_path()
-    initial_menu = load_menu_file(menu_file_path)
+    initial_menu = build_initial_menu(state)
     state.push_menu(initial_menu)
 
     while True:
