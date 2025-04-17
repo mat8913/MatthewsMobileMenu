@@ -9,7 +9,6 @@ import termios
 from pathlib import Path
 from typing import Iterator
 
-
 MENU_FILE_NAME = '.mmm-menufile'
 
 
