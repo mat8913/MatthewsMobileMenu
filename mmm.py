@@ -9,8 +9,6 @@ import termios
 from pathlib import Path
 from typing import Iterator, Optional, Protocol
 
-MENU_FILE_NAME = '.mmm-menufile'
-
 
 class MenuItem(Protocol):
     def get_name(self) -> str: ...
@@ -97,46 +95,54 @@ class TerminalMenuItem():
             print()
 
 
-def get_self_and_parent_paths(path: Path) -> Iterator[Path]:
-    yield path
-    for parent in path.parents:
-        yield parent
+class CustomMenuLoader():
+    MENU_FILE_NAME = '.mmm-menufile'
+
+    def load_custom_menu(self) -> list[MenuItem]:
+        menu_file_path = self.get_menu_file_path()
+        if menu_file_path is not None:
+            return self.load_menu_file(menu_file_path)
+        else:
+            return []
+
+    def load_menu_file(self, menu_file_path: Path) -> list[MenuItem]:
+        with open(menu_file_path) as f:
+            return [TerminalMenuItem(line.rstrip()) for line in f]
+
+    def get_menu_file_path(self) -> Optional[Path]:
+        for p in self.get_self_and_parent_paths(Path.cwd()):
+            menu_file_path = p / CustomMenuLoader.MENU_FILE_NAME
+            if menu_file_path.is_file():
+                return menu_file_path
+        return None
+
+    def get_self_and_parent_paths(self, path: Path) -> Iterator[Path]:
+        yield path
+        for parent in path.parents:
+            yield parent
 
 
-def get_menu_file_path() -> Path:
-    for p in get_self_and_parent_paths(Path.cwd()):
-        menu_file_path = p / MENU_FILE_NAME
-        if menu_file_path.is_file():
-            return menu_file_path
-    raise Exception('No menu file found in working directory or any parent directories: ' + MENU_FILE_NAME)
+class InitialMenuBuilder():
+    def build_initial_menu(self, state: MmmState) -> Menu:
+        back_items = [BackMenuItem(state)]
+        custom_menu_items = CustomMenuLoader().load_custom_menu()
+
+        return Menu(back_items + custom_menu_items)
 
 
-def load_menu_file(menu_file_path: Path) -> list[MenuItem]:
-    with open(menu_file_path) as f:
-        return [TerminalMenuItem(line.rstrip()) for line in f]
+class MmmApplication():
+    def run(self) -> None:
+        state = MmmState()
+        initial_menu = InitialMenuBuilder().build_initial_menu(state)
+        state.push_menu(initial_menu)
 
-
-def build_initial_menu(state: MmmState) -> Menu:
-    back_items = [BackMenuItem(state)]
-
-    menu_file_path = get_menu_file_path()
-    custom_menu_items = load_menu_file(menu_file_path)
-
-    return Menu(back_items + custom_menu_items)
-
-
-def main() -> None:
-    state = MmmState()
-    initial_menu = build_initial_menu(state)
-    state.push_menu(initial_menu)
-
-    while True:
-        menu = state.get_menu()
-        if not menu:
-            break
-        selected_menu_item = menu.ask_and_get_selected_item()
-        selected_menu_item.do_action()
+        while True:
+            menu = state.get_menu()
+            if not menu:
+                break
+            selected_menu_item = menu.ask_and_get_selected_item()
+            selected_menu_item.do_action()
 
 
 if __name__ == '__main__':
-    main()
+    MmmApplication().run()
