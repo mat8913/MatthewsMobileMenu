@@ -37,6 +37,25 @@ class Menu():
             print(f"{i})\t{menu_item.get_name()}")
 
 
+class MmmState():
+    menu_stack: list[Menu]
+
+    def __init__(self) -> None:
+        self.menu_stack = []
+
+    def pop_menu(self) -> None:
+        self.menu_stack.pop()
+
+    def push_menu(self, menu: Menu) -> None:
+        self.menu_stack.append(menu)
+
+    def get_menu(self) -> Optional[Menu]:
+        try:
+            return self.menu_stack[-1]
+        except IndexError:
+            return None
+
+
 class TerminalMenuItem():
     name: str
     cmd: str
@@ -82,10 +101,17 @@ def load_menu_file(menu_file_path: Path) -> Menu:
 
 
 def main() -> None:
+    state = MmmState()
     menu_file_path = get_menu_file_path()
-    menu = load_menu_file(menu_file_path)
-    selected_menu_item = menu.ask_and_get_selected_item()
-    selected_menu_item.do_action()
+    initial_menu = load_menu_file(menu_file_path)
+    state.push_menu(initial_menu)
+
+    while True:
+        menu = state.get_menu()
+        if not menu:
+            break
+        selected_menu_item = menu.ask_and_get_selected_item()
+        selected_menu_item.do_action()
 
 
 if __name__ == '__main__':
