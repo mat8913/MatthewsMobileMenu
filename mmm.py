@@ -7,9 +7,38 @@
 import fcntl
 import termios
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Optional, Protocol
 
 MENU_FILE_NAME = '.mmm-menufile'
+
+
+class MenuItem(Protocol):
+    def get_name(self) -> str: ...
+    def do_action(self) -> None: ...
+
+
+class TerminalMenuItem():
+    name: str
+    cmd: str
+
+    def __init__(self, name: str, cmd: Optional[str] = None) -> None:
+        self.name = name
+        self.cmd = cmd if cmd is not None else name
+
+    def get_name(self) -> str:
+        return self.name
+
+    def do_action(self) -> None:
+        self.simulate_terminal_input(self.cmd + '\n')
+        quit()
+
+    def simulate_terminal_input(self, input: str) -> None:
+        binput = input.encode('utf-8')
+        for i in range(len(binput)):
+            b = binput[i:i+1]
+            fcntl.ioctl(0, termios.TIOCSTI, b)
+        if not input.endswith('\n'):
+            print()
 
 
 def get_self_and_parent_paths(path: Path) -> Iterator[Path]:
@@ -26,28 +55,19 @@ def get_menu_file_path() -> Path:
     raise Exception('No menu file found in working directory or any parent directories: ' + MENU_FILE_NAME)
 
 
-def load_menu_file(menu_file_path: Path) -> list[str]:
+def load_menu_file(menu_file_path: Path) -> list[MenuItem]:
     with open(menu_file_path) as f:
-        return [line.rstrip() for line in f]
+        return [TerminalMenuItem(line.rstrip()) for line in f]
 
 
-def simulate_terminal_input(input: str) -> None:
-    binput = input.encode('utf-8')
-    for i in range(len(binput)):
-        b = binput[i:i+1]
-        fcntl.ioctl(0, termios.TIOCSTI, b)
-    if not input.endswith('\n'):
-        print()
-
-
-def print_menu(menu: list[str]) -> None:
+def print_menu(menu: list[MenuItem]) -> None:
     i = 0
     for item in menu:
-        print(str(i) + ')\t' + item)
+        print(str(i) + ')\t' + item.get_name())
         i = i + 1
 
 
-def parse_selection(menu: list[str], input: str) -> str:
+def parse_selection(menu: list[MenuItem], input: str) -> MenuItem:
     return menu[int(input)]
 
 
@@ -56,8 +76,8 @@ def main() -> None:
     menu = load_menu_file(menu_file_path)
     print_menu(menu)
     user_input = input('> ')
-    selected_command = parse_selection(menu, user_input)
-    simulate_terminal_input(selected_command + '\n')
+    selected_menu_item = parse_selection(menu, user_input)
+    selected_menu_item.do_action()
 
 
 if __name__ == '__main__':
